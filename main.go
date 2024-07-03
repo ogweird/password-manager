@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -12,8 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strconv"
-	"strings"
 )
 
 type user_data struct {
@@ -69,19 +66,11 @@ func aes_decrypt(msg string, key string) (string, error) {
 }
 
 func json_to_file(name string, data string) error {
-	var home, err_home = os.UserHomeDir()
-
-	if err_home != nil {
-		return fmt.Errorf("getting users home directory failed: %v", err_home)
+	if _, err_exists := os.Stat("/data"); os.IsNotExist(err_exists) {
+		os.Mkdir("data", os.ModePerm)
 	}
 
-	var err_folder = os.Mkdir(home+"\\pwd", os.ModePerm)
-
-	if err_folder != nil {
-		return fmt.Errorf("getting users home directory failed: %v", err_folder)
-	}
-
-	var err_write = os.WriteFile(home+"\\pwd\\"+name+".json", []byte(data), os.ModePerm)
+	var err_write = os.WriteFile("data\\"+name+".json", []byte(data), os.ModePerm)
 
 	if err_write != nil {
 		return fmt.Errorf("writing json to file failed: %v", err_write)
@@ -90,38 +79,21 @@ func json_to_file(name string, data string) error {
 	return nil
 }
 
-func cmd_in_int(msg string) int {
-	fmt.Print(msg)
-	input, err := bufio.NewReader(os.Stdin).ReadString('\n')
+func file_to_json(name string) (user_data, error) {
+	body, err_read := os.ReadFile("data\\" + name + ".json")
 
-	if err != nil {
-		fmt.Printf("reading input failed: %v", err)
-		return 0
+	if err_read != nil {
+		return user_data{}, fmt.Errorf("reading from file failed: %v", err_read)
 	}
 
-	strings.TrimSuffix(input, "\n")
+	var temp = user_data{}
+	var err_json = json.Unmarshal([]byte(body), &temp)
 
-	var conv, err_conv = strconv.Atoi(input)
-
-	if err_conv != nil {
-		fmt.Printf("type conversion input: %v", err)
-		return 0
+	if err_json != nil {
+		return user_data{}, fmt.Errorf("converting json to a structure failed: %v", err_json)
 	}
 
-	return conv
-}
-
-func cmd_in_string(msg string) string {
-	fmt.Print(msg)
-	input, err := bufio.NewReader(os.Stdin).ReadString('\n')
-
-	if err != nil {
-		fmt.Printf("reading input failed: %v", err)
-		return ""
-	}
-
-	strings.TrimSuffix(input, "\n")
-	return input
+	return temp, nil
 }
 
 func save_user_data(description string, login string, password string, key string) error {
@@ -151,23 +123,6 @@ func save_user_data(description string, login string, password string, key strin
 	return nil
 }
 
-func pause() error {
-	var buf = make([]byte, 1)
-
-	for {
-		var data, err_read = os.Stdin.Read(buf)
-
-		if data != 1 {
-			return err_read
-		}
-		if buf[0] == '\n' {
-			break
-		}
-	}
-
-	return nil
-}
-
 func clear() {
 	if runtime.GOOS == "windows" {
 		var cmd = exec.Command("cmd", "/c", "cls")
@@ -180,36 +135,62 @@ func clear() {
 	}
 }
 
-func main() { // TODO: FIX FAST
-	fmt.Printf("1. Save\n2. Read\n")
+func main() {
+	fmt.Printf("1. Save\n2. Read\n-> ")
 
-	var input = cmd_in_string("Option: ")
+	var main int
+	fmt.Scan(&main)
 
-	fmt.Print(input)
-
-	if strings.Compare(input, "1") == 0 {
+	if main == 1 {
 		clear()
-		var description = cmd_in_string("Description: ")
-		var login = cmd_in_string("\nLogin: ")
-		var password = cmd_in_string("\nPassword: ")
-		var key = cmd_in_string("\nEncryption Key (Save This!): ")
+		var desc, log, pass, key string
 
-		save_user_data(description, login, password, key)
+		fmt.Printf("Description\n-> ")
+		fmt.Scan(&desc)
+		fmt.Printf("Login\n-> ")
+		fmt.Scan(&log)
+		fmt.Printf("Password\n-> ")
+		fmt.Scan(&pass)
+		fmt.Printf("Encryption Key, Must Be 16-Bits Long!\n-> ")
+		fmt.Scan(&key)
 
-		var home, err_home = os.UserHomeDir()
+		save_user_data(desc, log, pass, key)
 
-		if err_home != nil {
-			fmt.Printf("getting users home directory failed: %v", err_home)
+		fmt.Printf("Data saved successfully!")
+		fmt.Scanln()
+		return
+	} else if main == 2 {
+		clear()
+		var desc, key string
+
+		fmt.Printf("Description\n-> ")
+		fmt.Scan(&desc)
+		fmt.Printf("Decryption Key\n-> ")
+		fmt.Scan(&key)
+
+		var data, err_read = file_to_json(desc)
+
+		if err_read != nil {
+			fmt.Printf("reading json from file failed: %v", err_read)
 			return
 		}
 
-		fmt.Printf("Succesfully saved data in: %v", home+"\\pwd")
-		pause()
-	} else if strings.Compare(input, "2") == 0 {
-		pause()
+		clear()
+
+		var pass_decrypt, err_decrypt = aes_decrypt(data.Password, key)
+
+		if err_decrypt != nil {
+			fmt.Printf("password decryption failed: %v", err_decrypt)
+			return
+		}
+
+		fmt.Printf("Login: %v\n", data.Login)
+		fmt.Printf("Password: %v\n", pass_decrypt)
+		fmt.Scanln()
+		return
 	} else {
-		fmt.Printf("not a valid option\n")
-		pause()
+		fmt.Printf("not a valid option")
+		fmt.Scanln()
 		return
 	}
 }
