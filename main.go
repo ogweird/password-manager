@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,7 +23,7 @@ func aes_encrypt(msg string, key string) (string, error) {
 	var block, err_cipher = aes.NewCipher([]byte(key))
 
 	if err_cipher != nil {
-		return "", fmt.Errorf("creating new cipher failed: %v", err_cipher)
+		return "", err_cipher
 	}
 
 	var cipher_text = make([]byte, aes.BlockSize+len([]byte(msg)))
@@ -30,7 +31,7 @@ func aes_encrypt(msg string, key string) (string, error) {
 	var _, err_read = io.ReadFull(rand.Reader, iv)
 
 	if err_read != nil {
-		return "", fmt.Errorf("encryption failed: %v", err_read)
+		return "", err_read
 	}
 
 	var stream = cipher.NewCFBEncrypter(block, iv)
@@ -43,17 +44,17 @@ func aes_decrypt(msg string, key string) (string, error) {
 	var cipher_text, err_b64 = base64.StdEncoding.DecodeString(msg)
 
 	if err_b64 != nil {
-		return "", fmt.Errorf("decoding base64 failed: %v", err_b64)
+		return "", err_b64
 	}
 
 	var block, err_cipher = aes.NewCipher([]byte(key))
 
 	if err_cipher != nil {
-		return "", fmt.Errorf("creating new cipher failed: %v", err_cipher)
+		return "", err_cipher
 	}
 
 	if len(cipher_text) < aes.BlockSize {
-		return "", fmt.Errorf("invalid block size")
+		return "", errors.New("invalid block size")
 	}
 
 	var iv = cipher_text[:aes.BlockSize]
@@ -73,7 +74,7 @@ func json_to_file(name string, data string) error {
 	var err_write = os.WriteFile("data\\"+name+".json", []byte(data), os.ModePerm)
 
 	if err_write != nil {
-		return fmt.Errorf("writing json to file failed: %v", err_write)
+		return err_write
 	}
 
 	return nil
@@ -83,14 +84,14 @@ func file_to_json(name string) (user_data, error) {
 	body, err_read := os.ReadFile("data\\" + name + ".json")
 
 	if err_read != nil {
-		return user_data{}, fmt.Errorf("reading from file failed: %v", err_read)
+		return user_data{}, err_read
 	}
 
 	var temp = user_data{}
 	var err_json = json.Unmarshal([]byte(body), &temp)
 
 	if err_json != nil {
-		return user_data{}, fmt.Errorf("converting json to a structure failed: %v", err_json)
+		return user_data{}, err_json
 	}
 
 	return temp, nil
@@ -100,7 +101,7 @@ func save_user_data(description string, login string, password string, key strin
 	var password_enc, err_enc = aes_encrypt(password, key)
 
 	if err_enc != nil {
-		return fmt.Errorf("password encryption failed: %v", err_enc)
+		return err_enc
 	}
 
 	var temp = user_data{
@@ -111,13 +112,13 @@ func save_user_data(description string, login string, password string, key strin
 	var json_data, err_json = json.MarshalIndent(temp, "", "    ")
 
 	if err_json != nil {
-		return fmt.Errorf("json failed: %v", err_json)
+		return err_json
 	}
 
 	var err_file = json_to_file(description, string(json_data))
 
 	if err_file != nil {
-		return fmt.Errorf("writing json to file failed: %v", err_file)
+		return err_file
 	}
 
 	return nil
