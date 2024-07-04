@@ -139,7 +139,7 @@ func main() {
 		fmt.Scan(&log)
 		fmt.Printf("Password\n-> ")
 		fmt.Scan(&pass)
-		fmt.Printf("Encryption Key, Must Be 16-Bits Long!\n-> ")
+		fmt.Printf("Encryption Key, Must Be 16, 24 or 32 bytes long!\n-> ")
 		fmt.Scan(&key)
 
 		if err_save := save_user_data(desc, log, pass, key); err_save != nil {
