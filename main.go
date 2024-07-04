@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 )
 
 type user_data struct {
@@ -28,9 +27,8 @@ func aes_encrypt(msg string, key string) (string, error) {
 
 	var cipher_text = make([]byte, aes.BlockSize+len([]byte(msg)))
 	var iv = cipher_text[:aes.BlockSize]
-	var _, err_read = io.ReadFull(rand.Reader, iv)
 
-	if err_read != nil {
+	if _, err_read := io.ReadFull(rand.Reader, iv); err_read != nil {
 		return "", err_read
 	}
 
@@ -71,9 +69,7 @@ func json_to_file(name string, data string) error {
 		os.Mkdir("data", os.ModePerm)
 	}
 
-	var err_write = os.WriteFile("data\\"+name+".json", []byte(data), os.ModePerm)
-
-	if err_write != nil {
+	if err_write := os.WriteFile("data\\"+name+".json", []byte(data), os.ModePerm); err_write != nil {
 		return err_write
 	}
 
@@ -88,9 +84,8 @@ func file_to_json(name string) (user_data, error) {
 	}
 
 	var temp = user_data{}
-	var err_json = json.Unmarshal([]byte(body), &temp)
 
-	if err_json != nil {
+	if err_json := json.Unmarshal([]byte(body), &temp); err_json != nil {
 		return user_data{}, err_json
 	}
 
@@ -115,25 +110,17 @@ func save_user_data(description string, login string, password string, key strin
 		return err_json
 	}
 
-	var err_file = json_to_file(description, string(json_data))
-
-	if err_file != nil {
+	if err_file := json_to_file(description, string(json_data)); err_file != nil {
 		return err_file
 	}
 
 	return nil
 }
 
-func clear() {
-	if runtime.GOOS == "windows" {
-		var cmd = exec.Command("cmd", "/c", "cls")
-		cmd.Stdout = os.Stdout
-		cmd.Run()
-	} else {
-		var cmd = exec.Command("clear")
-		cmd.Stdout = os.Stdout
-		cmd.Run()
-	}
+func clear_console() {
+	var cmd = exec.Command("cmd", "/c", "cls")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 }
 
 func main() {
@@ -143,7 +130,7 @@ func main() {
 	fmt.Scan(&main)
 
 	if main == 1 {
-		clear()
+		clear_console()
 		var desc, log, pass, key string
 
 		fmt.Printf("Description\n-> ")
@@ -155,13 +142,15 @@ func main() {
 		fmt.Printf("Encryption Key, Must Be 16-Bits Long!\n-> ")
 		fmt.Scan(&key)
 
-		save_user_data(desc, log, pass, key)
+		if err_save := save_user_data(desc, log, pass, key); err_save != nil {
+			fmt.Printf("%v", err_save)
+			return
+		}
 
 		fmt.Printf("Data saved successfully!")
-		fmt.Scanln()
 		return
 	} else if main == 2 {
-		clear()
+		clear_console()
 		var desc, key string
 
 		fmt.Printf("Description\n-> ")
@@ -176,7 +165,7 @@ func main() {
 			return
 		}
 
-		clear()
+		clear_console()
 
 		var pass_decrypt, err_decrypt = aes_decrypt(data.Password, key)
 
@@ -187,11 +176,9 @@ func main() {
 
 		fmt.Printf("Login: %v\n", data.Login)
 		fmt.Printf("Password: %v\n", pass_decrypt)
-		fmt.Scanln()
 		return
 	} else {
 		fmt.Printf("not a valid option")
-		fmt.Scanln()
 		return
 	}
 }
